@@ -2,8 +2,8 @@ name: Update sing-box rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"
-  workflow_dispatch:
+    - cron: "0 0 * * *"  # 每天 UTC 00:00 自动更新
+  workflow_dispatch:    # 支持手动触发
 
 jobs:
   build:
@@ -38,11 +38,14 @@ jobs:
           for name in "${!RULES[@]}"; do
             tmp="$(mktemp)"
 
+            # 下载并处理域名：去除表头、空行，去重、排序
             curl -fsSL "${RULES[$name]}" \
               | sed 's/\r//' \
               | sed '/^$/d' \
+              | sed '/^#/d' \
               | sort -u > "$tmp"
 
+            # 生成 sing-box JSON，加入 version:3
             jq -Rn '
               [inputs] |
               {

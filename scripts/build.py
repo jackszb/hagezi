@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-从 HaGeZi Multi PRO++ Adblock 列表下载并生成：
-  rules/pro.plus.json   - sing-box rule-set 源文件
-  rules/pro.plus.list   - Clash/Surge 风格的 DOMAIN-SUFFIX 列表
+从 HaGeZi Multi Adblock 列表下载并生成对应的规则文件：
+  rules/<name>.json   - sing-box rule-set 源文件
+  rules/<name>.list   - Clash/Surge 风格的 DOMAIN-SUFFIX 列表
 
 源文件格式示例：
   ||ads.example.com^
@@ -19,9 +19,19 @@ import re
 import sys
 import urllib.request
 
-SOURCE_URL = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.plus.txt"
-JSON_OUTPUT = "rules/pro.plus.json"
-LIST_OUTPUT = "rules/pro.plus.list"
+# 需要处理的规则源列表：每一项包含源地址和输出文件名（不含扩展名）
+SOURCES = [
+    {
+        "name": "pro.plus",
+        "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.plus.txt",
+    },
+    {
+        "name": "pro",
+        "url": "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt",
+    },
+]
+
+RULES_DIR = "rules"
 
 # 匹配形如 ||domain.tld^ 的 Adblock 规则行（允许行尾附加 $options，一并忽略）
 RULE_PATTERN = re.compile(r"^\|\|([a-zA-Z0-9](?:[a-zA-Z0-9\-_.]*[a-zA-Z0-9])?)\^")
@@ -66,26 +76,38 @@ def write_list(domains: list, path: str) -> None:
             f.write(f"DOMAIN-SUFFIX,{d}\n")
 
 
-def main() -> int:
-    print(f"下载源文件: {SOURCE_URL}")
-    text = fetch_source(SOURCE_URL)
+def build_one(name: str, url: str) -> bool:
+    json_output = os.path.join(RULES_DIR, f"{name}.json")
+    list_output = os.path.join(RULES_DIR, f"{name}.list")
+
+    print(f"[{name}] 下载源文件: {url}")
+    text = fetch_source(url)
 
     domains = extract_domains(text)
     if not domains:
-        print("错误：未提取到任何域名，终止执行以避免生成空文件。", file=sys.stderr)
-        return 1
+        print(f"[{name}] 错误：未提取到任何域名，跳过生成以避免空文件。", file=sys.stderr)
+        return False
 
-    print(f"提取到 {len(domains)} 个去重后的域名")
+    print(f"[{name}] 提取到 {len(domains)} 个去重后的域名")
 
-    os.makedirs(os.path.dirname(JSON_OUTPUT), exist_ok=True)
+    os.makedirs(os.path.dirname(json_output), exist_ok=True)
 
-    write_json(domains, JSON_OUTPUT)
-    print(f"已生成 {JSON_OUTPUT}")
+    write_json(domains, json_output)
+    print(f"[{name}] 已生成 {json_output}")
 
-    write_list(domains, LIST_OUTPUT)
-    print(f"已生成 {LIST_OUTPUT}")
+    write_list(domains, list_output)
+    print(f"[{name}] 已生成 {list_output}")
 
-    return 0
+    return True
+
+
+def main() -> int:
+    ok = True
+    for source in SOURCES:
+        success = build_one(source["name"], source["url"])
+        ok = ok and success
+
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
